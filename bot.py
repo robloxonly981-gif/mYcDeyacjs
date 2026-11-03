@@ -625,28 +625,30 @@ async def cmd_reboot(ctx):
     await asyncio.sleep(1)
     
     if getattr(sys, 'frozen', False):
-        # 1. Bersihkan Environment PyInstaller agar bot baru tidak panik
-        env = os.environ.copy()
-        for k in list(env.keys()):
-            if k.startswith('_PYI') or k.startswith('_MEIPASS'):
-                del env[k]
-                
         exe_path = sys.executable
         exe_name = os.path.basename(exe_path)
-        bat_path = os.path.join(BASE_DIR, "restart_bot.bat")
         
-        with open(bat_path, "w") as bat:
-            bat.write("@echo off\n")
-            bat.write("timeout /t 2 /nobreak >nul\n")
-            bat.write(f"taskkill /F /IM \"{exe_name}\" >nul 2>&1\n")
-            bat.write("timeout /t 1 /nobreak >nul\n")
-            bat.write(f"start \"\" \"{exe_path}\"\n")
-            bat.write("del \"%~f0\"\n")
-            
-        # 2. Jalankan script .bat dengan environment yang sudah bersih
-        subprocess.Popen(bat_path, shell=True, env=env, creationflags=subprocess.CREATE_NO_WINDOW)
+        # TRIK: Gunakan cmd.exe mandiri (DETACHED_PROCESS) agar tidak jadi "anak" dari bot lama
+        # 1. Tunggu 3 detik
+        # 2. Bunuh bot lama (jaga-jaga)
+        # 3. Tunggu 2 detik agar Windows hapus file temporary (_MEIxxxx)
+        # 4. Hapus environment variable PyInstaller
+        # 5. Buka bot baru
+        cmd = (
+            f'cmd.exe /c "timeout /t 3 /nobreak >nul & '
+            f'taskkill /F /IM "{exe_name}" >nul 2>&1 & '
+            f'timeout /t 2 /nobreak >nul & '
+            f'set _MEIPASS= & set _MEIPASS2= & set _PYI_PARENT_PROCESS_LEVEL= & '
+            f'start "" "{exe_path}""'
+        )
         
-        # 3. Matikan bot yang sekarang
+        subprocess.Popen(
+            cmd, 
+            shell=True, 
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+        
+        # Matikan bot saat ini
         os._exit(0)
     else:
         os._exit(0)
@@ -937,4 +939,4 @@ if __name__ == "__main__":
     import atexit
     atexit.register(lambda: tunnel_process.terminate() if tunnel_process else None)
     bot.run(TOKEN)
-    
+ 

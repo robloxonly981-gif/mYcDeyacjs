@@ -621,25 +621,21 @@ async def on_message(message):
 async def cmd_reboot(ctx):
     if ctx.channel.id != CHANNEL_ID: return
     await ctx.message.delete()
-    await ctx.send("🔄 **Merestart bot & membersihkan cache...**")
+    await ctx.send("🔄 **Merestart bot...**")
     await asyncio.sleep(1)
     
     if getattr(sys, 'frozen', False):
-        bat_path = os.path.join(BASE_DIR, "restart_bot.bat")
-        with open(bat_path, "w") as bat:
-            bat.write("@echo off\n")
-            # Tunggu 2 detik agar bot python sempat mati sendiri
-            bat.write("timeout /t 2 /nobreak >nul\n")
-            # Bunuh paksa sisa proses
-            bat.write(f"taskkill /F /IM \"{os.path.basename(sys.executable)}\" >nul 2>&1\n")
-            # TUNGGU 3 DETIK: Ini waktu emas bagi Windows untuk hapus folder temporary (cegah error PID)
-            bat.write("timeout /t 3 /nobreak >nul\n")
-            # Jalankan ulang bot
-            bat.write(f"start \"\" \"{sys.executable}\"\n")
-            bat.write("del \"%~f0\"\n")
-            
-        # Jalankan .bat secara terpisah (DETACHED) agar tidak ikut mati saat .exe lama ditutup
-        subprocess.Popen([bat_path], shell=True, creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+        exe_path = sys.executable
+        exe_name = os.path.basename(exe_path)
+        
+        # Trik Rahasia: Menggunakan cmd untuk menunda, membunuh proses, dan membuka file baru
+        # 'explorer.exe' memastikan proses baru tidak terikat dengan proses lama
+        cmd_str = f'timeout /t 3 /nobreak >nul & taskkill /F /IM "{exe_name}" >nul 2>&1 & explorer.exe "{exe_path}"'
+        
+        # Jalankan perintah secara terpisah (independen)
+        subprocess.Popen(cmd_str, shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        # Matikan bot yang sekarang
         os._exit(0)
     else:
         os._exit(0)

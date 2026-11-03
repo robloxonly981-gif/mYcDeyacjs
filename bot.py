@@ -621,21 +621,33 @@ async def on_message(message):
 async def cmd_reboot(ctx):
     if ctx.channel.id != CHANNEL_ID: return
     await ctx.message.delete()
-    await ctx.send("🔄 **Merestart bot...**")
+    await ctx.send("🔄 **Merestart bot & mendownload kode terbaru...**")
     await asyncio.sleep(1)
     
     if getattr(sys, 'frozen', False):
         exe_path = sys.executable
         exe_name = os.path.basename(exe_path)
+        bat_path = os.path.join(BASE_DIR, "restart_bot.bat")
         
-        # Trik Rahasia: Menggunakan cmd untuk menunda, membunuh proses, dan membuka file baru
-        # 'explorer.exe' memastikan proses baru tidak terikat dengan proses lama
-        cmd_str = f'timeout /t 3 /nobreak >nul & taskkill /F /IM "{exe_name}" >nul 2>&1 & explorer.exe "{exe_path}"'
-        
-        # Jalankan perintah secara terpisah (independen)
-        subprocess.Popen(cmd_str, shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
-        
-        # Matikan bot yang sekarang
+        with open(bat_path, "w") as bat:
+            bat.write("@echo off\n")
+            # TUNGGU 2 DETIK agar bot python mati dengan tenang
+            bat.write("timeout /t 2 /nobreak >nul\n")
+            # BUNUH paksa sisa proses jika masih menggantung
+            bat.write(f"taskkill /F /IM \"{exe_name}\" >nul 2>&1\n")
+            # TUNGGU 1 DETIK
+            bat.write("timeout /t 1 /nobreak >nul\n")
+            
+            # 🔥 TRIK PAMUNGKAS: Hapus environment variable PyInstaller!
+            bat.write("set _MEIPASS2=\n")
+            bat.write("set _MEIPASS=\n")
+            
+            # Jalankan bot baru
+            bat.write(f"start \"\" \"{exe_path}\"\n")
+            bat.write("del \"%~f0\"\n")
+            
+        # Gunakan explorer.exe agar .bat berjalan terpisah dari proses Python
+        subprocess.Popen(f'explorer.exe "{bat_path}"')
         os._exit(0)
     else:
         os._exit(0)
@@ -926,4 +938,3 @@ if __name__ == "__main__":
     import atexit
     atexit.register(lambda: tunnel_process.terminate() if tunnel_process else None)
     bot.run(TOKEN)
- 

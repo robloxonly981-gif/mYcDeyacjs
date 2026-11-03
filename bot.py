@@ -621,19 +621,17 @@ async def on_message(message):
 async def cmd_reboot(ctx):
     if ctx.channel.id != CHANNEL_ID: return
     await ctx.message.delete()
-    await ctx.send("🔄 **Merestart bot... Menunggu koneksi lama ditutup.**")
+    await ctx.send("🔄 **Merestart bot...**")
     await asyncio.sleep(1)
     
     if getattr(sys, 'frozen', False):
-        # Membuat script .bat untuk membunuh proses lama, menunggu, lalu membuka yg baru
         bat_path = os.path.join(BASE_DIR, "restart_bot.bat")
         with open(bat_path, "w") as bat:
             bat.write("@echo off\n")
-            bat.write("timeout /t 2 /nobreak >nul\n") # Tunggu 2 detik
+            bat.write("timeout /t 2 /nobreak >nul\n")
             bat.write(f"taskkill /F /IM {os.path.basename(sys.executable)} >nul 2>&1\n")
             bat.write(f"start \"\" \"{sys.executable}\"\n")
-            bat.write("del \"%~f0\"\n") # Hapus script ini setelah selesai
-            
+            bat.write("del \"%~f0\"\n")
         subprocess.Popen([bat_path], shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
         os._exit(0)
     else:

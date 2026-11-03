@@ -621,33 +621,32 @@ async def on_message(message):
 async def cmd_reboot(ctx):
     if ctx.channel.id != CHANNEL_ID: return
     await ctx.message.delete()
-    await ctx.send("🔄 **Merestart bot & mendownload kode terbaru...**")
+    await ctx.send("🔄 **Merestart bot...**")
     await asyncio.sleep(1)
     
     if getattr(sys, 'frozen', False):
+        # 1. Bersihkan Environment PyInstaller agar bot baru tidak panik
+        env = os.environ.copy()
+        for k in list(env.keys()):
+            if k.startswith('_PYI') or k.startswith('_MEIPASS'):
+                del env[k]
+                
         exe_path = sys.executable
         exe_name = os.path.basename(exe_path)
         bat_path = os.path.join(BASE_DIR, "restart_bot.bat")
         
         with open(bat_path, "w") as bat:
             bat.write("@echo off\n")
-            # TUNGGU 2 DETIK agar bot python mati dengan tenang
             bat.write("timeout /t 2 /nobreak >nul\n")
-            # BUNUH paksa sisa proses jika masih menggantung
             bat.write(f"taskkill /F /IM \"{exe_name}\" >nul 2>&1\n")
-            # TUNGGU 1 DETIK
             bat.write("timeout /t 1 /nobreak >nul\n")
-            
-            # 🔥 TRIK PAMUNGKAS: Hapus environment variable PyInstaller!
-            bat.write("set _MEIPASS2=\n")
-            bat.write("set _MEIPASS=\n")
-            
-            # Jalankan bot baru
             bat.write(f"start \"\" \"{exe_path}\"\n")
             bat.write("del \"%~f0\"\n")
             
-        # Gunakan explorer.exe agar .bat berjalan terpisah dari proses Python
-        subprocess.Popen(f'explorer.exe "{bat_path}"')
+        # 2. Jalankan script .bat dengan environment yang sudah bersih
+        subprocess.Popen(bat_path, shell=True, env=env, creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        # 3. Matikan bot yang sekarang
         os._exit(0)
     else:
         os._exit(0)
